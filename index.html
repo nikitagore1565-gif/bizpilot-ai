@@ -36,6 +36,7 @@ function notify(message){$('toast').textContent=message;$('toast').classList.rem
 function errText(e){return e?.message||String(e||'Unknown error')}
 async function query(table,fn){let q=supabaseClient.from(table).select('*').eq('workspace_id',workspaceId);return fn?fn(q):q}
 let workspaceSetupPromise=null,workspaceSetupUserId=null;
+let workspaceSetupPromise=null,workspaceSetupUserId=null;
 
 async function ensureWorkspace(){
  const userId=currentUser.id;
@@ -46,52 +47,20 @@ async function ensureWorkspace(){
  workspaceSetupUserId=userId;
 
  workspaceSetupPromise=(async()=>{
-  let {data:memberRows,error}=await supabaseClient
-   .from('workspace_members')
-   .select('workspace_id,role,created_at')
-   .eq('user_id',userId)
-   .order('created_at',{ascending:true})
-   .limit(1);
+  const {data,error}=await supabaseClient.rpc(
+   'get_or_create_default_workspace'
+  );
 
   if(error)throw error;
 
-  if(memberRows?.length){
-   workspaceId=memberRows[0].workspace_id;
-  }else{
-   let {data:ws,error:we}=await supabaseClient
-    .from('workspaces')
-    .insert({
-     name:'My Workspace',
-     owner_id:userId,
-     timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'
-    })
-    .select('id')
-    .single();
+  const row=Array.isArray(data)?data[0]:data;
 
-   if(we)throw we;
+  if(!row?.workspace_id)
+   throw new Error('Workspace RPC returned no workspace_id');
 
-   workspaceId=ws.id;
-
-   let {error:me}=await supabaseClient
-    .from('workspace_members')
-    .insert({
-     workspace_id:workspaceId,
-     user_id:userId,
-     role:'owner'
-    });
-
-   if(me)throw me;
-  }
-
-  let {data:w,error:readError}=await supabaseClient
-   .from('workspaces')
-   .select('name')
-   .eq('id',workspaceId)
-   .maybeSingle();
-
-  if(readError)throw readError;
-
-  $('workspace-label').textContent=w?.name||'My Workspace';
+  workspaceId=row.workspace_id;
+  $('workspace-label').textContent=
+   row.workspace_name||'My Workspace';
  })();
 
  try{
