@@ -35,17 +35,71 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function notify(message){$('toast').textContent=message;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),3500)}
 function errText(e){return e?.message||String(e||'Unknown error')}
 async function query(table,fn){let q=supabaseClient.from(table).select('*').eq('workspace_id',workspaceId);return fn?fn(q):q}
+let workspaceSetupPromise=null,workspaceSetupUserId=null;
+
 async function ensureWorkspace(){
- let {data:memberRows,error}=await supabaseClient.from('workspace_members').select('workspace_id,role').eq('user_id',currentUser.id).limit(1);
- if(error)throw error;
- if(memberRows?.length){workspaceId=memberRows[0].workspace_id;}
- else{
-  let {data:ws,error:we}=await supabaseClient.from('workspaces').insert({name:'My Workspace',owner_id:currentUser.id,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}).select('id').single();
-  if(we)throw we;workspaceId=ws.id;
-  let {error:me}=await supabaseClient.from('workspace_members').insert({workspace_id:workspaceId,user_id:currentUser.id,role:'owner'});if(me)throw me;
+ const userId=currentUser.id;
+
+ if(workspaceSetupPromise&&workspaceSetupUserId===userId)
+   return workspaceSetupPromise;
+
+ workspaceSetupUserId=userId;
+
+ workspaceSetupPromise=(async()=>{
+  let {data:memberRows,error}=await supabaseClient
+   .from('workspace_members')
+   .select('workspace_id,role,created_at')
+   .eq('user_id',userId)
+   .order('created_at',{ascending:true})
+   .limit(1);
+
+  if(error)throw error;
+
+  if(memberRows?.length){
+   workspaceId=memberRows[0].workspace_id;
+  }else{
+   let {data:ws,error:we}=await supabaseClient
+    .from('workspaces')
+    .insert({
+     name:'My Workspace',
+     owner_id:userId,
+     timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'
+    })
+    .select('id')
+    .single();
+
+   if(we)throw we;
+
+   workspaceId=ws.id;
+
+   let {error:me}=await supabaseClient
+    .from('workspace_members')
+    .insert({
+     workspace_id:workspaceId,
+     user_id:userId,
+     role:'owner'
+    });
+
+   if(me)throw me;
+  }
+
+  let {data:w,error:readError}=await supabaseClient
+   .from('workspaces')
+   .select('name')
+   .eq('id',workspaceId)
+   .maybeSingle();
+
+  if(readError)throw readError;
+
+  $('workspace-label').textContent=w?.name||'My Workspace';
+ })();
+
+ try{
+  return await workspaceSetupPromise;
+ }finally{
+  workspaceSetupPromise=null;
+  workspaceSetupUserId=null;
  }
- let {data:w}=await supabaseClient.from('workspaces').select('name').eq('id',workspaceId).maybeSingle();
- $('workspace-label').textContent=w?.name||'My Workspace';
 }
 async function loadAll(){
  const [c,a,r,s,b]=await Promise.all([
