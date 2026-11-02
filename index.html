@@ -74,3 +74,20 @@ function applyTemplate(name){localStorage.setItem('bizpilot_selected_template',n
 function addLead(){toast('Add contact form is ready for backend connection')}
 document.getElementById('menuBtn').onclick=()=>{document.getElementById('sidebar').classList.add('open');document.getElementById('overlay').classList.add('show')};document.getElementById('overlay').onclick=()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('overlay').classList.remove('show')};render();
 </script></body></html>
+<!-- Supabase Authentication -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+#auth-screen{
+ position:fixed;inset:0;z-index:9999;
+ background:#f5f7fb;display:flex;
+ align-items:center;justify-content:center;padding:20px
+}
+#auth-box{
+ width:100%;max-width:400px;background:white;
+ padding:28px;border-radius:16px;
+ box-shadow:0 10px 35px #0001
+}
+#auth-box h2{margin-top:0}
+#auth-box input{
+ width:100%;padding:12px;margin
